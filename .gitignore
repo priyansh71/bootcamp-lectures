@@ -1,0 +1,11 @@
+**/**/**/target
+**/**/target
+**/target
+**/Cargo.lock
+**/node_modules
+**/js/node_modules
+**/**/js/node_modules
+**/__pycache__
+.vscode
+**/.DS_Store
+**/*checkpoint.ipynb
