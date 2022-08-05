@@ -1,4 +1,4 @@
-use borsh::{BorshDeserialize, BorshSerialize};
+use borsh::{BorshDeserialize};
 use solana_program::{
     account_info::{next_account_info, AccountInfo},
     entrypoint::ProgramResult,
@@ -7,8 +7,8 @@ use solana_program::{
     pubkey::Pubkey,
 };
 
-use crate::instructions::TokenInstruction;
-use crate::state::{Mint, AccountTag, TokenAccount};
+use crate::instruction::TokenInstruction;
+use crate::state:: {Mint, AccountTag, TokenAccount};
 
 pub fn assert_with_msg(statement: bool, err: ProgramError, msg: &str) -> ProgramResult {
     if !statement {
@@ -32,27 +32,26 @@ impl Processor {
         let accounts_iter = &mut accounts.iter();
         match instruction {
             TokenInstruction::InitializeMint => {
-                let mint_ai = next_account_info(accounts_iter)?;
-                let mint_authority = next_account_info(accounts_iter)?;
-                let mut mint = Mint::load_unchecked(mint_ai)?;
+                let mint_ai = next_account_info(accounts_iter)?;        // Get Mint AccountInfo
+                let mint_authority = next_account_info(accounts_iter)?; // Get Mint Authority AccountInfo
+                let mut mint = Mint::load_unchecked(mint_ai)?;                  // Deserialize Mint AccountInfo data into mint
                 assert_with_msg(
                     mint_authority.is_signer,
                     ProgramError::MissingRequiredSignature,
                     "Mint Authority must sign",
                 )?;
-                // TODO
+
                 mint.tag = AccountTag::Mint;
                 mint.authority = *mint_authority.key;
                 mint.supply = 0;
-                mint.save(mint_ai)?
+                mint.save(mint_ai)?                 // Serialize the changed data into Mint AccountInfo data again
             }
             TokenInstruction::InitializeTokenAccount => {
                 let token_account_ai = next_account_info(accounts_iter)?;
                 let mint_ai = next_account_info(accounts_iter)?;
-                let mint = Mint::load(mint_ai)?;
                 let owner = next_account_info(accounts_iter)?;
                 let mut token_account = TokenAccount::load_unchecked(token_account_ai)?;
-                // TODO
+
                 token_account.tag = AccountTag::TokenAccount;
                 token_account.owner = *owner.key;
                 token_account.mint = *mint_ai.key;
@@ -60,12 +59,13 @@ impl Processor {
                 token_account.save(token_account_ai)?
             }
             TokenInstruction::Mint { amount } => {
+                // Create some tokens in the circulating supply and mint them to an address
                 msg!("Instruction: Mint");
                 let token_account_ai = next_account_info(accounts_iter)?;
                 let mint_ai = next_account_info(accounts_iter)?;
                 let mint_authority = next_account_info(accounts_iter)?;
-                let mut token_account = TokenAccount::load(token_account_ai)?;
-                let mut mint = Mint::load(mint_ai)?;
+                let mut token_account = TokenAccount::load(token_account_ai)?; // Deserialize Token_AccountInfo data and validates
+                let mut mint = Mint::load(mint_ai)?;                                   // Deserialize Mint AccountInfo data and validates
                 assert_with_msg(
                     mint_authority.is_signer,
                     ProgramError::MissingRequiredSignature,
@@ -76,16 +76,19 @@ impl Processor {
                     ProgramError::MissingRequiredSignature,
                     "Mint Authority mismatch",
                 )?;
-                // TODO
-                // unsafe 
-                // amount = u64::max_value();
-                mint.supply += amount;
-                token_account.amount += amount;
+                assert_with_msg(
+                    mint.supply + amount <= u64::max_value(),
+                    ProgramError::InvalidAccountData,
+                    "Mint supply overflow",
+                )?;
 
-                token_account.save(token_account_ai)?;
-                mint.save(mint_ai)?;
+                mint.supply += amount;                  // Increase the mint supply
+                token_account.amount += amount;         // Increase the token account balance
+                token_account.save(token_account_ai)?;  // Serialize Token_Account data
+                mint.save(mint_ai)?;                    // Serialize Mint_Account data
             }
             TokenInstruction::Burn { amount } => {
+                // Remove some tokens from circulation completely
                 msg!("Instruction: Burn");
                 let token_account_ai = next_account_info(accounts_iter)?;
                 let mint_ai = next_account_info(accounts_iter)?;
@@ -103,13 +106,18 @@ impl Processor {
                     "Token owner mismatch",
                 )?;
                 assert_with_msg(
+                    mint.supply >= amount, 
+                    ProgramError::InvalidAccountData,
+                    "Mint supply insufficient",
+                )?;
+                assert_with_msg(
                     token_account.amount >= amount, 
                     ProgramError::InvalidAccountData,
                     "Attempting to burn more than account balance",
                 )?;
-                // TODO
-                mint.supply -= amount;
-                token_account.amount -= amount;
+
+                mint.supply -= amount;                  // Reduce Mint supply
+                token_account.amount -= amount;         // Reduce Token_Account balance
                 token_account.save(token_account_ai)?;
                 mint.save(mint_ai)?;
             }
@@ -140,7 +148,7 @@ impl Processor {
                     ProgramError::InvalidAccountData,
                     "Token account mints do not match",
                 )?;
-                // TODO
+
                 src_token_account.amount -= amount;
                 dst_token_account.amount += amount;
                 src_token_account.save(src_token_account_ai)?;

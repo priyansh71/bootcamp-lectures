@@ -4,7 +4,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 pub enum TokenInstruction {
     InitializeMint,
     InitializeTokenAccount,
-    Mint { amount: u64 },
-    Burn { amount: u64 },
-    Transfer { amount: u64 },
+    Mint { amount: u64 },   // Increase Supply
+    Burn { amount: u64 },   // Decrease Supply
+    Transfer { amount: u64 }, // Transfer tokens to another account
 }
